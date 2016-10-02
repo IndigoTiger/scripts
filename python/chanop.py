@@ -118,6 +118,11 @@
 #     point out clones in the channel.
 #     Valid values: 'on', 'off' Default: 'off'
 #
+#   * plugins.var.python.chanop.preserve_op:
+#     If enabled, autodeop will not apply if you are already opped.
+#     Using --deop will override this.
+#     Valid values: 'on', 'off' Default: 'off'
+#
 #
 #   The following configs are global and can't be defined per server or channel.
 #
@@ -194,6 +199,11 @@
 #
 #
 #   History:
+#   2016-10-02
+#   version 0.4:
+#   * fix /obankick deopping before kicking if autodeop_delay is 0
+#   * add 'preserve_op' config option to not deop if you are already opped
+#
 #   2013-05-24
 #   version 0.3.1: bug fixes
 #   * fix exceptions while fetching bans with /mode
@@ -280,7 +290,7 @@ WEECHAT_VERSION = (0x30200, '0.3.2')
 
 SCRIPT_NAME    = "chanop"
 SCRIPT_AUTHOR  = "Elián Hanisch <lambdae2@gmail.com>"
-SCRIPT_VERSION = "0.3.1"
+SCRIPT_VERSION = "0.4.0"
 SCRIPT_LICENSE = "GPL3"
 SCRIPT_DESC    = "Helper script for IRC Channel Operators"
 
@@ -295,6 +305,7 @@ settings = {
 'enable_multi_kick'     :'off',
 'display_affected'      :'on',
 'enable_bar'            :'on',
+'preserve_op'           :'off',
 }
 
 try:
@@ -1900,7 +1911,9 @@ class CommandWithOp(CommandChanop):
             return
 
         self.irc.Op()
-        if (self.autodeop and self.get_config_boolean('autodeop')) or self.deopNow:
+        if (((self.autodeop and self.get_config_boolean('autodeop')) and not
+            (self.has_op(self.nick) and self.get_config_boolean('preserve_op')))
+            or self.deopNow):
             if self.deopNow:
                 delay = self.deop_delay
             else:
@@ -2283,7 +2296,7 @@ class MultiBanKick(BanKick):
         for nick in nicks:
             if self.inChannel(nick):
                 self.deop_delay += 1
-                self.irc.Kick(nick, reason, wait=1)
+                self.irc.Kick(nick, reason)
 
 class Topic(CommandWithOp):
     description, usage = "Changes channel topic.", "[-delete | topic]"
